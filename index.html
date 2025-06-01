@@ -13,6 +13,7 @@
         1. Report Info: Demand during lead time. -> Goal: Inform on variability. -> Viz: Bar Chart (Chart.js/Canvas). -> Interaction: Hover tooltips. -> Justification: A bar chart clearly shows the frequency of each demand level, highlighting the risk of high demand.
         2. Report Info: Cost calculations for different Safety Stock (SS) levels. -> Goal: Compare scenarios, find optimum. -> Viz/Method: Interactive buttons to select SS, dynamic text cards, and a grouped bar chart (Chart.js/Canvas). -> Interaction: User clicks a button to select an SS level. This updates all metric cards and highlights the corresponding data in the main chart. -> Justification: This interactive simulation is the core of the app. It allows users to actively engage with the cost trade-off analysis, making the "why" behind the optimal level of 100 units tangible and easy to understand.
         3. Report Info: Final recommendation and savings. -> Goal: Reinforce the key takeaway. -> Viz/Method: Large, clear static cards (HTML/Tailwind). -> Interaction: None. -> Justification: Static, high-impact cards effectively summarize the most crucial business outcomes—the final decision and the resulting savings.
+        4. Report Info: User-defined Safety Stock. -> Goal: Allow custom scenario analysis. -> Viz/Method: Input field, button, and dynamic text output (HTML/Tailwind/JS). -> Interaction: User inputs SS, clicks calculate, sees cost implications vs. optimum. -> Justification: Provides flexibility for users to explore scenarios not predefined, enhancing understanding of cost sensitivities.
     -->
     <style>
         body {
@@ -51,6 +52,28 @@
             border-color: #8C7D6B;
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .input-field {
+            border: 1px solid #D1C7BC;
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: #8C7D6B;
+            box-shadow: 0 0 0 2px rgba(140, 125, 107, 0.2);
+        }
+        .btn-calculate {
+            background-color: #8C7D6B;
+            color: white;
+            padding: 0.6rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .btn-calculate:hover {
+            background-color: #736353;
         }
     </style>
 </head>
@@ -107,7 +130,7 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                     <div>
-                        <h3 class="text-xl font-semibold text-[#3A3226] mb-4 text-center lg:text-left">Hasil untuk Skenario Terpilih</h3>
+                        <h3 class="text-xl font-semibold text-[#3A3226] mb-4 text-center lg:text-left">Hasil untuk Skenario Pra-Definisi Terpilih</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div class="kpi-card">
                                 <h4 class="text-sm font-medium text-gray-500">Persediaan Pengaman (SS)</h4>
@@ -134,11 +157,57 @@
                     </div>
 
                     <div class="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-200">
-                         <h3 class="text-xl font-semibold text-[#3A3226] mb-4 text-center">Perbandingan Biaya Total Antar Skenario</h3>
+                         <h3 class="text-xl font-semibold text-[#3A3226] mb-4 text-center">Grafik Analisis Biaya: Perbandingan Skenario SS</h3>
                         <div class="chart-container">
                             <canvas id="costComparisonChart"></canvas>
                         </div>
+                         <p class="text-xs text-gray-500 mt-3 text-center">Grafik ini membandingkan total biaya tahunan (kombinasi biaya penyimpanan dan biaya kehabisan stok) untuk setiap skenario persediaan pengaman (SS) yang telah ditentukan.</p>
                     </div>
+                </div>
+            </section>
+
+            <section id="custom-calculator" class="bg-white rounded-xl shadow-sm p-6 md:p-8 border border-gray-200">
+                <h2 class="text-2xl font-bold text-center text-[#3A3226] mb-2">Kalkulator Biaya Persediaan Pengaman Kustom</h2>
+                <p class="text-center max-w-2xl mx-auto text-gray-600 mb-8">Ingin mencoba skenario persediaan pengaman yang berbeda? Masukkan jumlah unit persediaan pengaman di bawah ini untuk menghitung perkiraan biaya tahunan dan perbandingannya dengan skenario optimal (100 unit).</p>
+                
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+                    <label for="customSSInput" class="text-md font-medium text-gray-700">Masukkan Persediaan Pengaman (unit):</label>
+                    <input type="number" id="customSSInput" min="0" step="1" class="input-field w-full sm:w-auto max-w-xs text-center" placeholder="Contoh: 75">
+                    <button id="calculateCustomSS" class="btn-calculate">Hitung Biaya</button>
+                </div>
+
+                <div id="customSSResult" class="mt-6 space-y-3 hidden">
+                    <h3 class="text-lg font-semibold text-[#3A3226] text-center">Hasil untuk Persediaan Pengaman <span id="customSSValueDisplay"></span> Unit:</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div class="kpi-card">
+                            <h4 class="text-sm font-medium text-gray-500">Biaya Penyimpanan Tahunan</h4>
+                            <p class="text-2xl font-bold mt-1">$<span id="customCarryingCost"></span></p>
+                        </div>
+                        <div class="kpi-card">
+                            <h4 class="text-sm font-medium text-gray-500">Ekspektasi Biaya Kehabisan Stok</h4>
+                            <p class="text-2xl font-bold mt-1">$<span id="customStockoutCost"></span></p>
+                        </div>
+                        <div class="kpi-card bg-[#F4F1ED]">
+                            <h4 class="text-sm font-medium text-gray-600">Total Biaya Tahunan</h4>
+                            <p class="text-2xl font-bold text-[#8C7D6B] mt-1">$<span id="customTotalCost"></span></p>
+                        </div>
+                    </div>
+                    <h3 class="text-lg font-semibold text-[#3A3226] text-center pt-4">Perbandingan dengan Skenario Optimal (SS 100 unit):</h3>
+                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div class="kpi-card">
+                            <h4 class="text-sm font-medium text-gray-500">Perubahan Biaya Penyimpanan</h4>
+                            <p class="text-2xl font-bold mt-1"><span id="diffCarryingCost"></span></p>
+                        </div>
+                        <div class="kpi-card">
+                            <h4 class="text-sm font-medium text-gray-500">Perubahan Biaya Kehabisan Stok</h4>
+                            <p class="text-2xl font-bold mt-1"><span id="diffStockoutCost"></span></p>
+                        </div>
+                        <div class="kpi-card">
+                            <h4 class="text-sm font-medium text-gray-500">Perubahan Total Biaya</h4>
+                            <p class="text-2xl font-bold mt-1"><span id="diffTotalCost"></span></p>
+                        </div>
+                    </div>
+                    <p id="customSSNote" class="text-sm text-center text-gray-600 mt-2"></p>
                 </div>
             </section>
             
@@ -198,6 +267,7 @@
             };
 
             function calculateCosts(ss) {
+                if (isNaN(ss) || ss < 0) ss = 0; // Ensure ss is a non-negative number
                 const rop = inventoryData.baseParams.expectedDemand + ss;
                 let expectedShortage = 0;
 
@@ -225,6 +295,7 @@
             }, {});
             
             let costChart;
+            const optimalSSCosts = scenarioCosts['100'];
             
             const createDemandChart = () => {
                 const ctx = document.getElementById('demandChart').getContext('2d');
@@ -285,29 +356,34 @@
                 costChart = new Chart(ctx, {
                     type: 'bar',
                     data: {
-                        labels: labels.map(l => `${l} Unit`),
+                        labels: labels.map(l => `${l} Unit SS`),
                         datasets: [
                             {
                                 label: 'Biaya Penyimpanan',
                                 data: labels.map(ss => scenarioCosts[ss].carryingCost),
                                 backgroundColor: '#DCD3C9',
                                 borderWidth: 1,
-                                borderRadius: 4
+                                borderRadius: 4,
+                                stack: 'Stack 0',
                             },
                             {
                                 label: 'Biaya Kehabisan Stok',
                                 data: labels.map(ss => scenarioCosts[ss].stockoutCost),
                                 backgroundColor: '#F08080',
                                 borderWidth: 1,
-                                borderRadius: 4
+                                borderRadius: 4,
+                                stack: 'Stack 0',
                             },
                             {
                                 label: 'Total Biaya',
                                 data: labels.map(ss => scenarioCosts[ss].totalCost),
                                 backgroundColor: '#A99985',
-                                borderWidth: 1,
+                                borderColor: '#8C7D6B',
+                                borderWidth: 2,
                                 borderRadius: 4,
-                                order: -1
+                                type: 'line', 
+                                tension: 0.1,
+                                order: -1 
                             }
                         ]
                     },
@@ -315,6 +391,9 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
+                            title: {
+                                display: false,
+                            },
                             legend: {
                                 position: 'bottom',
                             },
@@ -329,12 +408,12 @@
                         scales: {
                             y: {
                                 beginAtZero: true,
-                                stacked: true,
+                                // stacked: true, // Removed for line chart to show total cost independently
                                 title: { display: true, text: 'Biaya Tahunan ($)' }
                             },
                             x: {
                                 stacked: true,
-                                title: { display: true, text: 'Tingkat Persediaan Pengaman' }
+                                title: { display: true, text: 'Tingkat Persediaan Pengaman (SS)' }
                             }
                         },
                     }
@@ -366,16 +445,79 @@
                     btn.classList.toggle('active', btn.dataset.ss === ss);
                 });
 
-                costChart.data.datasets.forEach(dataset => {
-                     dataset.borderColor = dataset.data.map((_, i) => {
-                        return costChart.data.labels[i] === `${ss} Unit` ? '#3A3226' : 'transparent';
-                    });
-                    dataset.borderWidth = costChart.data.labels.map((_, i) => {
-                        return costChart.data.labels[i] === `${ss} Unit` ? 3 : 1;
-                    });
+                costChart.data.datasets.forEach((dataset, datasetIndex) => {
+                    if (dataset.type === 'line') { // Highlight point on line chart
+                        dataset.pointBorderColor = dataset.data.map((_, i) => {
+                             return costChart.data.labels[i] === `${ss} Unit SS` ? '#3A3226' : 'transparent';
+                        });
+                        dataset.pointBorderWidth = costChart.data.labels.map((_, i) => {
+                             return costChart.data.labels[i] === `${ss} Unit SS` ? 3 : 1;
+                        });
+                         dataset.pointBackgroundColor = dataset.data.map((_, i) => {
+                             return costChart.data.labels[i] === `${ss} Unit SS` ? '#3A3226' : dataset.backgroundColor;
+                        });
+
+                    } else { // For bar charts
+                        dataset.borderColor = dataset.data.map((_, i) => {
+                            return costChart.data.labels[i] === `${ss} Unit SS` ? '#3A3226' : 'transparent';
+                        });
+                        dataset.borderWidth = costChart.data.labels.map((_, i) => {
+                            return costChart.data.labels[i] === `${ss} Unit SS` ? 3 : 1;
+                        });
+                    }
                 });
                 costChart.update();
             };
+            
+            function formatCostDifference(value) {
+                const sign = value > 0 ? '+' : (value < 0 ? '' : '');
+                return `${sign}$${Math.abs(value).toLocaleString()}`;
+            }
+
+            document.getElementById('calculateCustomSS').addEventListener('click', () => {
+                const customSSInput = document.getElementById('customSSInput');
+                const customSSValue = parseInt(customSSInput.value);
+
+                if (isNaN(customSSValue) || customSSValue < 0) {
+                    alert("Silakan masukkan jumlah persediaan pengaman yang valid (angka positif).");
+                    return;
+                }
+
+                const customCosts = calculateCosts(customSSValue);
+                
+                document.getElementById('customSSValueDisplay').textContent = customSSValue.toLocaleString();
+                document.getElementById('customCarryingCost').textContent = customCosts.carryingCost.toLocaleString();
+                document.getElementById('customStockoutCost').textContent = customCosts.stockoutCost.toLocaleString();
+                document.getElementById('customTotalCost').textContent = customCosts.totalCost.toLocaleString();
+
+                const diffCarrying = customCosts.carryingCost - optimalSSCosts.carryingCost;
+                const diffStockout = customCosts.stockoutCost - optimalSSCosts.stockoutCost;
+                const diffTotal = customCosts.totalCost - optimalSSCosts.totalCost;
+
+                document.getElementById('diffCarryingCost').textContent = formatCostDifference(diffCarrying);
+                document.getElementById('diffStockoutCost').textContent = formatCostDifference(diffStockout);
+                document.getElementById('diffTotalCost').textContent = formatCostDifference(diffTotal);
+                
+                document.getElementById('diffCarryingCost').className = `text-2xl font-bold mt-1 ${diffCarrying > 0 ? 'text-red-500' : (diffCarrying < 0 ? 'text-green-500' : 'text-gray-700')}`;
+                document.getElementById('diffStockoutCost').className = `text-2xl font-bold mt-1 ${diffStockout > 0 ? 'text-red-500' : (diffStockout < 0 ? 'text-green-500' : 'text-gray-700')}`;
+                document.getElementById('diffTotalCost').className = `text-2xl font-bold mt-1 ${diffTotal > 0 ? 'text-red-500' : (diffTotal < 0 ? 'text-green-500' : 'text-gray-700')}`;
+                
+                let note = '';
+                if (customSSValue === 100) {
+                    note = "Ini adalah tingkat persediaan pengaman optimal yang direkomendasikan.";
+                } else if (customCosts.totalCost < optimalSSCosts.totalCost) {
+                    note = `Dengan ${customSSValue} unit SS, total biaya tahunan Anda lebih RENDAH $${Math.abs(diffTotal).toLocaleString()} dibandingkan skenario optimal. Ini mungkin terjadi jika data permintaan atau biaya berubah.`;
+                } else if (customCosts.totalCost > optimalSSCosts.totalCost) {
+                     note = `Dengan ${customSSValue} unit SS, total biaya tahunan Anda lebih TINGGI $${Math.abs(diffTotal).toLocaleString()} dibandingkan skenario optimal.`;
+                } else {
+                    note = `Dengan ${customSSValue} unit SS, total biaya tahunan Anda SAMA dengan skenario optimal.`;
+                }
+                document.getElementById('customSSNote').textContent = note;
+
+
+                document.getElementById('customSSResult').classList.remove('hidden');
+            });
+
 
             document.querySelector('#simulator').addEventListener('click', (e) => {
                 if (e.target.matches('.btn-selector')) {
