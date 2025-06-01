@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dasbor Analisis Persediaan Pengaman - Isnafa Beauty</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Visualization & Content Choices: 
+        1. Report Info: Demand during lead time. -> Goal: Inform on variability. -> Viz: Bar Chart (Chart.js/Canvas). -> Interaction: Hover tooltips. -> Justification: A bar chart clearly shows the frequency of each demand level, highlighting the risk of high demand.
+        2. Report Info: Cost calculations for different Safety Stock (SS) levels. -> Goal: Compare scenarios, find optimum. -> Viz/Method: Interactive buttons to select SS, dynamic text cards, and a grouped bar chart (Chart.js/Canvas). -> Interaction: User clicks a button to select an SS level. This updates all metric cards and highlights the corresponding data in the main chart. -> Justification: This interactive simulation is the core of the app. It allows users to actively engage with the cost trade-off analysis, making the "why" behind the optimal level of 100 units tangible and easy to understand.
+        3. Report Info: Final recommendation and savings. -> Goal: Reinforce the key takeaway. -> Viz/Method: Large, clear static cards (HTML/Tailwind). -> Interaction: None. -> Justification: Static, high-impact cards effectively summarize the most crucial business outcomes—the final decision and the resulting savings.
+    -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF8;
+            color: #4A4A4A;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 350px;
+            max-height: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+        .kpi-card {
+            background-color: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            border: 1px solid #F0EBE5;
+            transition: all 0.3s ease-in-out;
+        }
+        .btn-selector {
+            transition: all 0.2s ease-in-out;
+            border: 1px solid #D1C7BC;
+        }
+        .btn-selector.active {
+            background-color: #8C7D6B;
+            color: white;
+            border-color: #8C7D6B;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+
+        <header class="text-center mb-12">
+            <h1 class="text-3xl md:text-4xl font-bold text-[#3A3226] mb-2">Analisis Optimalisasi Persediaan Pengaman</h1>
+            <p class="text-lg text-[#6B5F51]">Untuk Produk Terlaris: Coconut Lip Balm Isnafa Beauty</p>
+        </header>
+
+        <main class="space-y-16">
+            
+            <section id="rekomendasi" class="bg-white rounded-xl shadow-sm p-6 md:p-8 border border-gray-200">
+                <h2 class="text-2xl font-bold text-center text-[#3A3226] mb-6">Rekomendasi Utama & Dampak Finansial</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 text-center">
+                    <div class="kpi-card bg-[#F4F1ED]">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase">Persediaan Pengaman Optimal</h3>
+                        <p class="text-3xl font-bold text-[#8C7D6B] mt-2">100 <span class="text-xl font-medium">unit</span></p>
+                    </div>
+                    <div class="kpi-card bg-[#F4F1ED]">
+                        <h3 class="text-sm font-medium text-gray-500 uppercase">Total Biaya Tahunan Minimum</h3>
+                        <p class="text-3xl font-bold text-[#8C7D6B] mt-2">$1,000</p>
+                    </div>
+                    <div class="kpi-card bg-green-50 border-green-200">
+                        <h3 class="text-sm font-medium text-green-700 uppercase">Potensi Penghematan Tahunan</h3>
+                        <p class="text-3xl font-bold text-green-600 mt-2">$9,500</p>
+                    </div>
+                </div>
+                 <p class="text-center mt-6 text-gray-600">Dengan menerapkan rekomendasi ini, titik pemesanan ulang (Reorder Point) yang baru adalah <strong>300 unit</strong>, naik dari 200 unit.</p>
+            </section>
+
+            <section id="analisis-permintaan">
+                <h2 class="text-2xl font-bold text-center text-[#3A3226] mb-2">Memahami Masalah: Variabilitas Permintaan</h2>
+                 <p class="text-center max-w-3xl mx-auto text-gray-600 mb-8">Analisis dimulai dengan memahami pola permintaan historis selama waktu tunggu (lead time). Data menunjukkan permintaan rata-rata adalah 200 unit, tetapi seringkali berfluktuasi. Grafik di bawah ini menunjukkan probabilitas setiap tingkat permintaan, menyoroti risiko kehabisan stok jika tidak ada persediaan pengaman.</p>
+                <div class="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-200">
+                    <div class="chart-container max-w-3xl">
+                        <canvas id="demandChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section id="simulator">
+                <h2 class="text-2xl font-bold text-center text-[#3A3226] mb-2">Simulator Biaya: Menemukan Titik Optimal</h2>
+                <p class="text-center max-w-3xl mx-auto text-gray-600 mb-8">Gunakan simulator ini untuk menjelajahi bagaimana tingkat persediaan pengaman yang berbeda mempengaruhi total biaya. Pilih tingkat persediaan pengaman untuk melihat perincian biaya penyimpanan dan biaya kehabisan stok, lalu lihat perbandingannya pada grafik.</p>
+
+                <div class="flex justify-center flex-wrap gap-3 mb-8">
+                    <button class="btn-selector font-medium py-2 px-6 rounded-full" data-ss="0">0 Unit</button>
+                    <button class="btn-selector font-medium py-2 px-6 rounded-full" data-ss="50">50 Unit</button>
+                    <button class="btn-selector font-medium py-2 px-6 rounded-full active" data-ss="100">100 Unit</button>
+                    <button class="btn-selector font-medium py-2 px-6 rounded-full" data-ss="150">150 Unit</button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                    <div>
+                        <h3 class="text-xl font-semibold text-[#3A3226] mb-4 text-center lg:text-left">Hasil untuk Skenario Terpilih</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="kpi-card">
+                                <h4 class="text-sm font-medium text-gray-500">Persediaan Pengaman (SS)</h4>
+                                <p class="text-2xl font-bold mt-1"><span id="ss-value"></span> unit</p>
+                            </div>
+                            <div class="kpi-card">
+                                <h4 class="text-sm font-medium text-gray-500">Titik Pemesanan Ulang (ROP)</h4>
+                                <p class="text-2xl font-bold mt-1"><span id="rop-value"></span> unit</p>
+                            </div>
+                            <div class="kpi-card">
+                                <h4 class="text-sm font-medium text-gray-500">Biaya Penyimpanan Tahunan</h4>
+                                <p class="text-2xl font-bold mt-1">$<span id="carrying-cost"></span></p>
+                            </div>
+                            <div class="kpi-card">
+                                <h4 class="text-sm font-medium text-gray-500">Ekspektasi Biaya Kehabisan Stok</h4>
+                                <p class="text-2xl font-bold mt-1">$<span id="stockout-cost"></span></p>
+                            </div>
+                            <div class="kpi-card sm:col-span-2 bg-[#F4F1ED]">
+                                <h4 class="text-md font-semibold text-gray-600 text-center">Total Biaya Tahunan Terkait</h4>
+                                <p class="text-4xl font-bold text-center text-[#8C7D6B] mt-2">$<span id="total-cost"></span></p>
+                            </div>
+                        </div>
+                         <div id="explanation-text" class="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-700"></div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm p-4 md:p-6 border border-gray-200">
+                         <h3 class="text-xl font-semibold text-[#3A3226] mb-4 text-center">Perbandingan Biaya Total Antar Skenario</h3>
+                        <div class="chart-container">
+                            <canvas id="costComparisonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="langkah-selanjutnya">
+                <h2 class="text-2xl font-bold text-center text-[#3A3226] mb-6">Langkah Selanjutnya untuk Keberlanjutan</h2>
+                <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="kpi-card text-center">
+                        <div class="text-3xl mb-2 text-[#8C7D6B]">📊</div>
+                        <h3 class="font-semibold text-lg mb-1">Tinjauan Berkala</h3>
+                        <p class="text-sm text-gray-600">Tinjau parameter permintaan dan biaya secara periodik (misal, 6-12 bulan) untuk memastikan strategi tetap optimal.</p>
+                    </div>
+                    <div class="kpi-card text-center">
+                        <div class="text-3xl mb-2 text-[#8C7D6B]">🚚</div>
+                        <h3 class="font-semibold text-lg mb-1">Pantau Waktu Tunggu</h3>
+                        <p class="text-sm text-gray-600">Monitor kinerja waktu tunggu pemasok. Variabilitas yang tinggi mungkin memerlukan penyesuaian persediaan pengaman.</p>
+                    </div>
+                    <div class="kpi-card text-center">
+                        <div class="text-3xl mb-2 text-[#8C7D6B]">💡</div>
+                        <h3 class="font-semibold text-lg mb-1">Pertimbangkan Faktor Lain</h3>
+                        <p class="text-sm text-gray-600">Faktor seperti diskon kuantitas atau keterbatasan gudang dapat menjadi pertimbangan tambahan dalam praktik.</p>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <footer class="text-center mt-16 pt-8 border-t border-gray-200">
+            <p class="text-sm text-gray-500">&copy; 2024 Isnafa Beauty. Dasbor Analisis Interaktif.</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const inventoryData = {
+                demandDistribution: [
+                    { demand: 100, probability: 0.25 },
+                    { demand: 150, probability: 0.10 },
+                    { demand: 200, probability: 0.25 },
+                    { demand: 250, probability: 0.20 },
+                    { demand: 300, probability: 0.20 },
+                ],
+                costs: {
+                    carryingCostPerUnit: 10,
+                    stockoutCostPerUnit: 35,
+                    ordersPerYear: 10
+                },
+                baseParams: {
+                    expectedDemand: 200
+                }
+            };
+
+            const scenarios = {
+                '0': { ss: 0, rop: 200 },
+                '50': { ss: 50, rop: 250 },
+                '100': { ss: 100, rop: 300 },
+                '150': { ss: 150, rop: 350 },
+            };
+
+            function calculateCosts(ss) {
+                const rop = inventoryData.baseParams.expectedDemand + ss;
+                let expectedShortage = 0;
+
+                inventoryData.demandDistribution.forEach(d => {
+                    const shortage = Math.max(0, d.demand - rop);
+                    expectedShortage += shortage * d.probability;
+                });
+
+                const annualCarryingCost = ss * inventoryData.costs.carryingCostPerUnit;
+                const annualStockoutCost = expectedShortage * inventoryData.costs.stockoutCostPerUnit * inventoryData.costs.ordersPerYear;
+                const totalCost = annualCarryingCost + annualStockoutCost;
+
+                return {
+                    ss,
+                    rop,
+                    carryingCost: annualCarryingCost,
+                    stockoutCost: annualStockoutCost,
+                    totalCost
+                };
+            }
+
+            const scenarioCosts = Object.keys(scenarios).reduce((acc, ss) => {
+                acc[ss] = calculateCosts(parseInt(ss));
+                return acc;
+            }, {});
+            
+            let costChart;
+            
+            const createDemandChart = () => {
+                const ctx = document.getElementById('demandChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: inventoryData.demandDistribution.map(d => `${d.demand} Unit`),
+                        datasets: [{
+                            label: 'Probabilitas Permintaan',
+                            data: inventoryData.demandDistribution.map(d => d.probability),
+                            backgroundColor: '#C8BBAE',
+                            borderColor: '#8C7D6B',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += `${(context.parsed.y * 100).toFixed(0)}%`;
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Probabilitas' },
+                                ticks: {
+                                    callback: function(value) {
+                                        return (value * 100) + '%'
+                                    }
+                                }
+                            },
+                            x: {
+                                title: { display: true, text: 'Jumlah Permintaan Selama Waktu Tunggu' }
+                            }
+                        }
+                    }
+                });
+            };
+
+            const createCostComparisonChart = () => {
+                const ctx = document.getElementById('costComparisonChart').getContext('2d');
+                const labels = Object.keys(scenarios);
+                costChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels.map(l => `${l} Unit`),
+                        datasets: [
+                            {
+                                label: 'Biaya Penyimpanan',
+                                data: labels.map(ss => scenarioCosts[ss].carryingCost),
+                                backgroundColor: '#DCD3C9',
+                                borderWidth: 1,
+                                borderRadius: 4
+                            },
+                            {
+                                label: 'Biaya Kehabisan Stok',
+                                data: labels.map(ss => scenarioCosts[ss].stockoutCost),
+                                backgroundColor: '#F08080',
+                                borderWidth: 1,
+                                borderRadius: 4
+                            },
+                            {
+                                label: 'Total Biaya',
+                                data: labels.map(ss => scenarioCosts[ss].totalCost),
+                                backgroundColor: '#A99985',
+                                borderWidth: 1,
+                                borderRadius: 4,
+                                order: -1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: $${context.parsed.y.toLocaleString()}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                stacked: true,
+                                title: { display: true, text: 'Biaya Tahunan ($)' }
+                            },
+                            x: {
+                                stacked: true,
+                                title: { display: true, text: 'Tingkat Persediaan Pengaman' }
+                            }
+                        },
+                    }
+                });
+            };
+
+            const updateDashboard = (ss) => {
+                const data = scenarioCosts[ss];
+                
+                document.getElementById('ss-value').textContent = data.ss.toLocaleString();
+                document.getElementById('rop-value').textContent = data.rop.toLocaleString();
+                document.getElementById('carrying-cost').textContent = data.carryingCost.toLocaleString();
+                document.getElementById('stockout-cost').textContent = data.stockoutCost.toLocaleString();
+                document.getElementById('total-cost').textContent = data.totalCost.toLocaleString();
+                
+                let explanation = '';
+                if(ss === '0') {
+                    explanation = `Tanpa persediaan pengaman, biaya penyimpanan adalah $0, tetapi risiko kehabisan stok sangat tinggi, menghasilkan ekspektasi biaya tahunan sebesar $10,500.`;
+                } else if(ss === '50') {
+                    explanation = `Dengan 50 unit, biaya penyimpanan menjadi $500. Ini secara signifikan mengurangi biaya kehabisan stok menjadi $3,500, dengan total biaya $4,000.`;
+                } else if(ss === '100') {
+                    explanation = `Ini adalah titik optimal. Biaya penyimpanan adalah $1,000, tetapi biaya kehabisan stok (berdasarkan data historis) menjadi $0. Ini menghasilkan total biaya terendah.`;
+                } else if(ss === '150') {
+                    explanation = `Meningkatkan persediaan lebih lanjut tidak lagi ekonomis. Biaya kehabisan stok tetap $0, tetapi biaya penyimpanan naik menjadi $1,500, meningkatkan total biaya.`;
+                }
+                document.getElementById('explanation-text').innerHTML = explanation;
+
+                document.querySelectorAll('.btn-selector').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.ss === ss);
+                });
+
+                costChart.data.datasets.forEach(dataset => {
+                     dataset.borderColor = dataset.data.map((_, i) => {
+                        return costChart.data.labels[i] === `${ss} Unit` ? '#3A3226' : 'transparent';
+                    });
+                    dataset.borderWidth = costChart.data.labels.map((_, i) => {
+                        return costChart.data.labels[i] === `${ss} Unit` ? 3 : 1;
+                    });
+                });
+                costChart.update();
+            };
+
+            document.querySelector('#simulator').addEventListener('click', (e) => {
+                if (e.target.matches('.btn-selector')) {
+                    const selectedSS = e.target.dataset.ss;
+                    updateDashboard(selectedSS);
+                }
+            });
+
+            createDemandChart();
+            createCostComparisonChart();
+            updateDashboard('100');
+        });
+    </script>
+
+</body>
+</html>
